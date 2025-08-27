@@ -2,11 +2,20 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import google.generativeai as genai
 import json
+import os
+from dotenv import load_dotenv
 from typing import Dict, List
 
-# Import your existing GymChatbot class
+# Load environment variables from .env file
+load_dotenv()
+
 class GymChatbot:
-    def __init__(self, api_key: str):
+    def __init__(self):
+        # Get API key from environment variable
+        api_key = os.getenv('GEMINI_API_KEY')
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY environment variable is required. Please check your .env file.")
+        
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-1.5-flash')
         
@@ -131,9 +140,14 @@ class GymChatbot:
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-# Initialize the chatbot with your API key
-API_KEY = "AIzaSyDfuo1TijR4tnunaRQfTClnlwNHHNB0t9U"  # Your API key from the original code
-chatbot = GymChatbot(API_KEY)
+# Initialize the chatbot
+try:
+    chatbot = GymChatbot()
+    print("✅ Gym Chatbot initialized successfully!")
+except ValueError as e:
+    print(f"❌ Error: {e}")
+    print("Please create a .env file with your GEMINI_API_KEY")
+    exit(1)
 
 @app.route('/')
 def home():
@@ -142,7 +156,9 @@ def home():
         "endpoints": [
             "POST /chat - Send message to chatbot",
             "POST /clear - Clear chat history",
-            "GET /history - Get chat history"
+            "GET /history - Get chat history",
+            "GET /health - Health check",
+            "GET /gym_data - Get gym data"
         ]
     })
 
@@ -214,6 +230,9 @@ def save_conversation():
         data = request.get_json()
         filename = data.get('filename', 'gym_conversation.json')
         
+        # Create conversations directory if it doesn't exist
+        os.makedirs('conversations', exist_ok=True)
+        
         # Save conversation to server
         with open(f'conversations/{filename}', 'w') as f:
             json.dump(chatbot.chat_history, f, indent=2)
@@ -244,7 +263,6 @@ def get_gym_data():
 
 if __name__ == '__main__':
     # Create conversations directory if it doesn't exist
-    import os
     os.makedirs('conversations', exist_ok=True)
     
     print("🏋️ Starting Gym Chatbot API Server...")
